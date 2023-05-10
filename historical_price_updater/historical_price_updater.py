@@ -140,8 +140,7 @@ def task_save_historical_data_to_database(
 
 
 def initiate_data_updater_schedule(
-    download_args: mytypes.DownloadParams,
-    trigger_time: str = "02:30"
+    download_args: mytypes.DownloadParams, trigger_time: str = "02:30"
 ) -> None:
     """
     Schedule the script to run once a day at a specific time.
@@ -150,7 +149,9 @@ def initiate_data_updater_schedule(
     :param trigger_time: The time to run the script.
     """
     # Schedule the script to run once a day at trigger_time
-    schedule.every().day.at(trigger_time).do(task_save_historical_data_to_database, download_args)
+    schedule.every().day.at(trigger_time).do(
+        task_save_historical_data_to_database, download_args
+    )
 
     while True:
         # Check if any scheduled jobs are due to run
@@ -188,7 +189,7 @@ if __name__ == "__main__":
             stock_table_url=env.DOWNLOAD_STOCK_TABLE_URL,
             bench=env.DOWNLOAD_BENCHMARK_SYMBOL,
             days=env.DOWNLOAD_DAYS_BACK,
-            interval_str=env.DOWNLOAD_DATA_INTERVAL
+            interval_str=env.DOWNLOAD_DATA_INTERVAL,
         ),
-        env.UPDATER_TRIGGER_TIME
+        env.UPDATER_TRIGGER_TIME,
     )

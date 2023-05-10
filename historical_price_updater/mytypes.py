@@ -9,10 +9,11 @@ class DownloadParams(BaseModel):
     """
     parameters for downloading stock data
     """
-    stock_table_url: str = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-    bench: str = 'SPY'
+
+    stock_table_url: str = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    bench: str = "SPY"
     days: int = 365
-    interval_str: str = '1d'
+    interval_str: str = "1d"
 
 
 class ConnectionSettings(BaseModel):

@@ -28,7 +28,7 @@ def yf_download_data(tickers, days, interval) -> pd.DataFrame:
         tickers,
         start=(datetime.now() - timedelta(days=days)),
         end=datetime.now(),
-        interval=interval
+        interval=interval,
     )
     return _normalize_yfinance_dataframe(data)
 
