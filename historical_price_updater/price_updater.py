@@ -1,11 +1,9 @@
 import pathlib
 from typing import Type
-import time
 import pandas as pd
-import schedule
-import utils
-import env
-import mytypes
+import sqlalchemy
+import historical_price_updater.utils as utils
+import historical_price_updater.mytypes as mytypes
 
 
 def _download_data(
@@ -101,8 +99,8 @@ def modify_dataframe(data: pd.DataFrame) -> pd.DataFrame:
 def save_historical_data_to_database(
     stock_data: pd.DataFrame,
     bench_data: pd.DataFrame,
-    engine,
-    hp: Type[env.HistoricalPrices],
+    engine: sqlalchemy.Engine,
+    hp: Type[mytypes.HistoricalPrices],
     interval_str: str,
 ) -> None:
     """
@@ -118,13 +116,12 @@ def save_historical_data_to_database(
     historical_data, timestamp_data = _build_tables(
         stock_data, bench_data, interval_str=interval_str
     )
-    historical_data["interval"] = interval_str
     historical_data.to_sql(hp.stock_data, engine, index=False, if_exists="replace")
     timestamp_data.to_sql(hp.timestamp_data, engine, index=False, if_exists="replace")
 
 
 def task_save_historical_data_to_database(
-    download_args: mytypes.DownloadParams,
+    download_args: mytypes.DownloadParams, connection_engine: sqlalchemy.Engine
 ) -> None:
     """
     Schedule the script to save historical data to a database.
@@ -133,30 +130,10 @@ def task_save_historical_data_to_database(
     save_historical_data_to_database(
         stock_data,
         bench_data,
-        env.ConnectionEngines.HistoricalPrices.NEON,
-        env.HistoricalPrices,
+        connection_engine,
+        mytypes.HistoricalPrices,
         interval_str=download_args.interval_str,
     )
-
-
-def initiate_data_updater_schedule(
-    download_args: mytypes.DownloadParams, trigger_time: str = "02:30"
-) -> None:
-    """
-    Schedule the script to run once a day at a specific time.
-
-    :param download_args:
-    :param trigger_time: The time to run the script.
-    """
-    # Schedule the script to run once a day at trigger_time
-    schedule.every().day.at(trigger_time).do(
-        task_save_historical_data_to_database, download_args
-    )
-
-    while True:
-        # Check if any scheduled jobs are due to run
-        schedule.run_pending()
-        time.sleep(1)
 
 
 def re_download_stock_data() -> None:
@@ -181,15 +158,3 @@ def load_pickle_stock_data() -> tuple:
         pathlib.Path("..") / "data" / "bench_data_raw_push_test.pkl"
     )
     return stock_data, bench_data
-
-
-if __name__ == "__main__":
-    initiate_data_updater_schedule(
-        mytypes.DownloadParams(
-            stock_table_url=env.DOWNLOAD_STOCK_TABLE_URL,
-            bench=env.DOWNLOAD_BENCHMARK_SYMBOL,
-            days=env.DOWNLOAD_DAYS_BACK,
-            interval_str=env.DOWNLOAD_DATA_INTERVAL,
-        ),
-        env.UPDATER_TRIGGER_TIME,
-    )

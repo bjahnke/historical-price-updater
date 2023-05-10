@@ -40,6 +40,7 @@ def yf_get_stock_data(symbol, days, interval: str) -> pd.DataFrame:
         end=datetime.now(),
         interval=interval,
     )
+    data.index = data.index.tz_localize(None)
     return _normalize_yfinance_dataframe(data)
 
 

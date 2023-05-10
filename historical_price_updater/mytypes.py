@@ -5,6 +5,11 @@ from typing import Optional, Mapping, Sequence, Union
 from pydantic import BaseModel
 
 
+class HistoricalPrices:
+    stock_data = "stock_data"
+    timestamp_data = "timestamp_data"
+
+
 class DownloadParams(BaseModel):
     """
     parameters for downloading stock data
