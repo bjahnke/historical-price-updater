@@ -10,7 +10,12 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=7.0', ]
+requirements = [
+    'data_manager @ git+https://github.com/bjahnke/data_manager.git#egg=data_manager',
+    'sqlalchemy',
+    'pandas',
+    'schedule'
+]
 
 test_requirements = ['pytest>=3', ]
 
@@ -29,18 +34,14 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     description="download stock data, reformat, push to database",
-    entry_points={
-        'console_scripts': [
-            'tmp=tmp.cli:main',
-        ],
-    },
+    entry_points={},
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
-    keywords='tmp',
-    name='tmp',
-    packages=find_packages(include=['tmp', 'tmp.*']),
+    keywords='historical_price_updator',
+    name='historical_price_updator',
+    packages=find_packages(include=['historical_price_updator', 'historical_price_updator.*']),
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/bjahnke71/historical_price_updater',

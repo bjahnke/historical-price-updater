@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-"""Tests for `tmp` package."""
+"""Tests for `historical_price_updator` package."""
 
 import pytest
 
 from click.testing import CliRunner
 
-from tmp import historical_price_updater
-from tmp import cli
+from historical_price_updator import historical_price_updater
+from historical_price_updator import cli
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def test_command_line_interface():
     runner = CliRunner()
     result = runner.invoke(cli.main)
     assert result.exit_code == 0
-    assert 'tmp.cli.main' in result.output
+    assert 'historical_price_updator.cli.main' in result.output
     help_result = runner.invoke(cli.main, ['--help'])
     assert help_result.exit_code == 0
     assert '--help  Show this message and exit.' in help_result.output

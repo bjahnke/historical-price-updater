@@ -24,5 +24,5 @@ deploy:
     secure: PLEASE_REPLACE_ME
   on:
     tags: true
-    repo: bjahnke71/tmp
+    repo: bjahnke71/historical_price_updator
     python: 3.8

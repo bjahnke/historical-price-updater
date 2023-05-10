@@ -1,1 +1,1 @@
-"""Unit test package for tmp."""
+"""Unit test package for historical_price_updator."""
