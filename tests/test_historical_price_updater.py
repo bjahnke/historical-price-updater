@@ -1,7 +1,9 @@
 """Tests for `historical_price_updator` package."""
+import pandas as pd
 import pytest
-import historical_price_updater.mytypes as mytypes
-import historical_price_updater.price_updater as price_updater
+from historical_price_updater import mytypes
+from historical_price_updater import price_updater
+from historical_price_updater import env
 
 
 def test_build_tables():
@@ -13,3 +15,9 @@ def test_build_tables():
         bench_data=bench_data,
         interval_str=download_args.interval_str,
     )
+
+
+def test_connection():
+    """does database connection to neon db work?"""
+    a = pd.DataFrame()
+    a.to_sql('test', env.ConnectionEngines.HistoricalPrices.NEON, index=False, if_exists="replace")

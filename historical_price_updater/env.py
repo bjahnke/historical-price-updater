@@ -18,6 +18,13 @@ DOWNLOAD_BENCHMARK_SYMBOL = os.environ.get("DOWNLOAD_BENCHMARK_SYMBOL", "SPY")
 DOWNLOAD_DAYS_BACK = os.environ.get("DOWNLOAD_DAYS_BACK", 365)
 DOWNLOAD_DATA_INTERVAL = os.environ.get("DOWNLOAD_DATA_INTERVAL", "1d")
 
+DOCKER_TOKEN = os.environ.get("DOCKER_TOKEN")
+DOCKER_USERNAME = os.environ.get("DOCKER_USERNAME")
+GCR_PROJECT_ID = os.environ.get("GCR_PROJECT_ID")
+
+HOST: str = os.environ.get("HOST")
+PORT: int = int(os.environ.get("PORT")) if os.environ.get("PORT") else 8080
+
 
 class ConnectionEngines:
     class HistoricalPrices:

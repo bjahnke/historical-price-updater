@@ -2,8 +2,8 @@ import pathlib
 from typing import Type
 import pandas as pd
 import sqlalchemy
-import historical_price_updater.utils as utils
-import historical_price_updater.mytypes as mytypes
+import utils
+import mytypes
 
 
 def _download_data(
