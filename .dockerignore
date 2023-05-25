@@ -1,0 +1,16 @@
+.github/
+.idea/
+.pytest_cache/
+venv/
+conf/
+docs/
+tests/
+*.rst
+*.pyc
+*.pyo
+*.pyd
+.editorconfig
+.env.sample
+.gitignore
+task.py
+.env

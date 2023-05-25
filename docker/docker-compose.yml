@@ -1,0 +1,8 @@
+services:
+    update-schedule:
+        image: price-updater
+        container_name: update-schedule
+        env_file:
+            -   ../.env
+        environment:
+            UPDATER_TRIGGER_TIME: "02:30"

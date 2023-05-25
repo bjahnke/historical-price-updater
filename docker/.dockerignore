@@ -1,7 +1,0 @@
-.github/
-.idea/
-.pytest_cache/
-venv/
-conf/
-historical_price_updater/data/
-*.pyc
