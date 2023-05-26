@@ -4,6 +4,7 @@ import pandas as pd
 import sqlalchemy
 import utils
 import mytypes
+import typing as t
 
 
 def _download_data(
@@ -11,7 +12,7 @@ def _download_data(
     bench: str = "SPY",
     days: int = 365,
     interval_str: str = "1d",
-) -> tuple:
+) -> t.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Download stock price data and benchmark data.
 
@@ -21,11 +22,11 @@ def _download_data(
     :param interval_str: The interval of the historical data to download.
     :return: A tuple containing the downloaded stock data and benchmark data.
     """
-    ticks, _ = utils.get_wikipedia_stocks(stock_table_url)
+    ticks, stock_info = utils.get_wikipedia_stocks(stock_table_url)
     downloaded_data = utils.yf_download_data(ticks, days, interval_str)
     bench_data = utils.yf_get_stock_data(bench, days, interval_str)
     bench_data["symbol"] = bench
-    return downloaded_data, bench_data
+    return downloaded_data, bench_data, stock_info
 
 
 def _build_tables(
@@ -99,6 +100,7 @@ def modify_dataframe(data: pd.DataFrame) -> pd.DataFrame:
 def save_historical_data_to_database(
     stock_data: pd.DataFrame,
     bench_data: pd.DataFrame,
+    stock_info: pd.DataFrame,
     engine: sqlalchemy.Engine,
     hp: Type[mytypes.HistoricalPrices],
     interval_str: str,
@@ -106,6 +108,7 @@ def save_historical_data_to_database(
     """
     Save historical stock price data to a database.
 
+    :param stock_info:
     :param stock_data: The downloaded stock price data.
     :param bench_data: The benchmark data.
     :param engine: A `ConnectionSettings` object containing the database connection settings.
@@ -118,6 +121,7 @@ def save_historical_data_to_database(
     )
     historical_data.to_sql(hp.stock_data, engine, index=False, if_exists="replace")
     timestamp_data.to_sql(hp.timestamp_data, engine, index=False, if_exists="replace")
+    stock_info.to_sql(hp.stock_info, engine, index=False, if_exists="replace")
 
 
 def task_save_historical_data_to_database(
@@ -126,10 +130,11 @@ def task_save_historical_data_to_database(
     """
     Schedule the script to save historical data to a database.
     """
-    stock_data, bench_data = _download_data(**download_args.dict())
+    stock_data, bench_data, stock_info = _download_data(**download_args.dict())
     save_historical_data_to_database(
         stock_data,
         bench_data,
+        stock_info,
         connection_engine,
         mytypes.HistoricalPrices,
         interval_str=download_args.interval_str,

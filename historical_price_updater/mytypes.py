@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class HistoricalPrices:
     stock_data = "stock_data"
     timestamp_data = "timestamp_data"
+    stock_info = "stock_info"
 
 
 class DownloadParams(BaseModel):
