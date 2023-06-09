@@ -17,7 +17,7 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 # Copy the rest of the application code to the working directory
-COPY ../historical-price-updater/docker /app
+COPY . /app
 
 # Add the application's directory to the PYTHONPATH
 ENV PYTHONPATH "${PYTHONPATH}:/app"
