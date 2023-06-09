@@ -1,6 +1,7 @@
-# Use the official Python 3.9 image as the base
-FROM python:3.9
+# Use the official Python 3.11 image as the base
+FROM python:3.11
 
+# Expose port 8080 for google cloud run compatibility
 EXPOSE 8080
 
 # Set the working directory to /app
@@ -11,11 +12,15 @@ RUN apt-get update && apt-get install -y libpq-dev
 
 # Copy the rest of the application code to the working directory
 COPY requirements.txt ./
+
 # Install the dependencies
 RUN pip install -r requirements.txt
 
-COPY ./ ./
+# Copy the rest of the application code to the working directory
+COPY ../historical-price-updater/docker /app
 
-ENTRYPOINT [ "python3" ]
+# Add the application's directory to the PYTHONPATH
+ENV PYTHONPATH "${PYTHONPATH}:/app"
+
 # Set the command to run when the container starts
-CMD [ "historical_price_updater/update_schedule.py" ]
+CMD [ "python3", "src/historical_price_updater/main.py" ]

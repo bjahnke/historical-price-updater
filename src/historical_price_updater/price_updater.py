@@ -7,7 +7,7 @@ import mytypes
 import typing as t
 import socket
 
-from historical_price_updater import env
+import env
 
 
 def _download_data(
@@ -149,8 +149,8 @@ def re_download_stock_data() -> None:
     Download and cache stock data locally for testing.
     """
     stock_data, bench_data = _download_data(**mytypes.DownloadParams().dict())
-    stock_data.to_pickle(pathlib.Path("..") / "data" / "stock_data_raw_push_test.pkl")
-    bench_data.to_pickle(pathlib.Path("..") / "data" / "bench_data_raw_push_test.pkl")
+    stock_data.to_pickle(pathlib.Path("../..") / "data" / "stock_data_raw_push_test.pkl")
+    bench_data.to_pickle(pathlib.Path("../..") / "data" / "bench_data_raw_push_test.pkl")
 
 
 def load_pickle_stock_data() -> tuple:
@@ -160,10 +160,10 @@ def load_pickle_stock_data() -> tuple:
     :return: A tuple containing the stock data and benchmark data.
     """
     stock_data = pd.read_pickle(
-        pathlib.Path("..") / "data" / "stock_data_raw_push_test.pkl"
+        pathlib.Path("../..") / "data" / "stock_data_raw_push_test.pkl"
     )
     bench_data = pd.read_pickle(
-        pathlib.Path("..") / "data" / "bench_data_raw_push_test.pkl"
+        pathlib.Path("../..") / "data" / "bench_data_raw_push_test.pkl"
     )
     return stock_data, bench_data
 

@@ -1,9 +1,7 @@
 """Tests for `historical_price_updator` package."""
 import pandas as pd
-import pytest
-from historical_price_updater import mytypes
-from historical_price_updater import price_updater
-from historical_price_updater import env
+from src.historical_price_updater import mytypes, price_updater
+import env
 
 
 def test_build_tables():

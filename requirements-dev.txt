@@ -11,3 +11,5 @@ pytest
 black
 pyyaml
 invoke
+cookiecutter
+git+https://github.com/bjahnke/utility-invoke-tasks.git
