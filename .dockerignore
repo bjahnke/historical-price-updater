@@ -20,4 +20,3 @@ env.yaml
 .env.sample
 LICENSE
 requirements-dev.txt
-tasks.py

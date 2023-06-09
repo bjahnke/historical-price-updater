@@ -2,8 +2,6 @@
 Desc: loads configuration data to python environment
 """
 from sqlalchemy import create_engine
-
-import env
 from env.env_auto import *
 
 # Load environment variables from .env file
@@ -20,4 +18,4 @@ DOWNLOAD_DATA_INTERVAL = os.environ.get("DOWNLOAD_DATA_INTERVAL", "1d")
 
 class ConnectionEngines:
     class HistoricalPrices:
-        NEON = create_engine(env.NEON_DB_CONSTR)
+        NEON = create_engine(NEON_DB_CONSTR)
