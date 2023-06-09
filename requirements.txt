@@ -6,3 +6,4 @@ pandas
 schedule
 psycopg2-binary
 yfinance
+flask
