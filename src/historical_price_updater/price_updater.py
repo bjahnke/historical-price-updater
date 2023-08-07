@@ -46,7 +46,7 @@ def _build_tables(
     downloaded_data = downloaded_data.reset_index()
     dd_timestamp = downloaded_data.columns.to_list()[0]
     dd_date_time = downloaded_data[dd_timestamp]
-    bench_data = bench_data.reset_index()
+    bench_data = bench_data.reset_index().rename(columns={"index": 'bar_number'})
     bd_date_time = bench_data[bench_data.columns.to_list()[0]]
     # remove timestamp column
     downloaded_data = downloaded_data.iloc[:, 1:]
