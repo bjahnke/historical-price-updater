@@ -21,7 +21,7 @@ def gcrdeploy(c):
         '--image',
         docker_tag,
         '--region',
-        'us-east1'
+        'us-east1',
         '--no-allow-unauthenticated',
         '--project',
         get_env_var('GCR_PROJECT_ID'),
