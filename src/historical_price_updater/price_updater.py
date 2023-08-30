@@ -2,8 +2,8 @@ import pathlib
 from typing import Type
 import pandas as pd
 import sqlalchemy
-import utils
-import mytypes
+import src.historical_price_updater.utils as utils
+import src.historical_price_updater.mytypes as mytypes
 import typing as t
 import socket
 
@@ -46,7 +46,7 @@ def _build_tables(
     downloaded_data = downloaded_data.reset_index()
     dd_timestamp = downloaded_data.columns.to_list()[0]
     dd_date_time = downloaded_data[dd_timestamp]
-    bench_data = bench_data.reset_index().rename(columns={"index": 'bar_number'})
+    bench_data = bench_data.reset_index()
     bd_date_time = bench_data[bench_data.columns.to_list()[0]]
     # remove timestamp column
     downloaded_data = downloaded_data.iloc[:, 1:]
@@ -54,7 +54,7 @@ def _build_tables(
 
     # ensure bench has same dates as stock data
     assert dd_date_time.equals(bd_date_time)
-
+    bench_data = bench_data.reset_index().rename(columns={"index": "bar_number"})
     # melt multiindex df (stretch vertically)
     relative = utils.simple_relative(downloaded_data, bench_data.close)
     downloaded_data = downloaded_data.reset_index().rename(
