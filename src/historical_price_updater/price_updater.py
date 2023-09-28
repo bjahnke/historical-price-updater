@@ -1,210 +1,99 @@
-import pathlib
-from typing import Type
 import pandas as pd
 import sqlalchemy
 import src.historical_price_updater.utils as utils
 import src.historical_price_updater.mytypes as mytypes
 import typing as t
-import socket
-
 import env
 
 
-def _download_data(
-    stock_table_url: str = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    bench: str = "SPY",
-    days: int = 365,
-    interval_str: str = "1d",
-) -> t.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def build_relative_data_against_interval_markets(
+        source_watchlist: pd.DataFrame, data: pd.DataFrame, interval: str) -> t.Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Download stock price data and benchmark data.
-
-    :param stock_table_url: URL of the stock table on Wikipedia.
-    :param bench: The symbol of the benchmark to use.
-    :param days: Number of days of historical data to download.
-    :param interval_str: The interval of the historical data to download.
-    :return: A tuple containing the downloaded stock data and benchmark data.
+    Perform relative calculation for all market indexes at a given interval and source watchlist
+    :param source_watchlist:
+    :param data:
+    :param interval:
+    :return:
     """
-    ticks, stock_info = utils.get_wikipedia_stocks(stock_table_url)
-    downloaded_data = utils.yf_download_data(ticks, days, interval_str)
-    bench_data = utils.yf_get_stock_data(bench, days, interval_str)
-    bench_data["symbol"] = bench
-    return downloaded_data, bench_data, stock_info
+    base_data_list = []
+    relative_data_list = []
 
+    market_index_at_interval = source_watchlist.loc[
+        source_watchlist["interval"] == interval, "market_index"].unique()
+    for market_index in market_index_at_interval:
+        if pd.isna(market_index) or market_index not in data.close.columns.to_list():
+            continue
+        bench_data = data.close[[market_index]].copy()
+        # exclude bench data from base data
+        base_data = data.close[
+            source_watchlist.loc[
+                (source_watchlist["market_index"] == market_index) &
+                (source_watchlist["interval"] == interval)
+                ].symbol.to_list()
+        ].copy()
 
-def _build_tables(
-    downloaded_data: pd.DataFrame, bench_data: pd.DataFrame, interval_str: str
-) -> tuple:
-    """
-    Build the historical and timestamp tables.
+        relative_data_list.append(utils.simple_relative(base_data, bench_data[market_index]))
+        relative_data = utils.simple_relative(base_data, bench_data[market_index])
 
-    :param downloaded_data: The downloaded stock price data.
-    :param bench_data: The benchmark data.
-    :param interval_str: The interval of the historical data.
-    :return: A tuple containing the historical data and timestamp data.
-    """
-    downloaded_data = downloaded_data.reset_index()
-    dd_timestamp = downloaded_data.columns.to_list()[0]
-    dd_date_time = downloaded_data[dd_timestamp]
-    bench_data = bench_data.reset_index()
-    bd_date_time = bench_data[bench_data.columns.to_list()[0]]
-    # remove timestamp column
-    downloaded_data = downloaded_data.iloc[:, 1:]
-    bench_data = bench_data.iloc[:, 1:]
+        relative_data_list.append(relative_data)
+        base_data_list.append(base_data)
 
-    # ensure bench has same dates as stock data
-    assert dd_date_time.equals(bd_date_time)
-    bench_data = bench_data.reset_index().rename(columns={"index": "bar_number"})
-    # melt multiindex df (stretch vertically)
-    relative = utils.simple_relative(downloaded_data, bench_data.close)
-    downloaded_data = downloaded_data.reset_index().rename(
-        columns={"index": "bar_number"}
-    )
-    relative = relative.reset_index().rename(columns={"index": "bar_number"})
-    relative = modify_dataframe(relative)
+    absolute_data = pd.concat(base_data_list, axis=1)
+    absolute_data = absolute_data.reset_index().rename(columns={"index": "bar_number"})
 
-    # create timestamp table
-    timestamp_data = downloaded_data[["bar_number"]].copy()
-    timestamp_data["interval"] = interval_str
-    timestamp_data["timestamp"] = dd_date_time
-    timestamp_data.columns = timestamp_data.columns.droplevel(1)
+    relative_data = pd.concat(relative_data_list, axis=1)
+    relative_data = relative_data.reset_index().rename(columns={"index": "bar_number"})
 
-    downloaded_data = modify_dataframe(downloaded_data)
-
-    # create historical table
-    relative["is_relative"] = True
-    downloaded_data["is_relative"] = False
-    bench_data["is_relative"] = False
-
-    historical_data = pd.concat([downloaded_data, relative, bench_data], axis=0)
-    historical_data["interval"] = interval_str
-
-    return historical_data, timestamp_data
-
-
-def modify_dataframe(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Modify the input dataframe to make it suitable for the database.
-
-    :param data: The dataframe to modify.
-    :return: The modified dataframe.
-    """
-    # Melt dataframe to stack the columns
-    data = data.melt(
-        id_vars="bar_number", var_name=["type", "symbol"], value_name="value"
-    )
-    # Pivot the 'type' column to expand the dataframe vertically
-    data = data.pivot_table(
-        index=["symbol", "bar_number"], columns="type", values="value"
-    ).reset_index()
-    return data
-
-
-def save_historical_data_to_database(
-    stock_data: pd.DataFrame,
-    bench_data: pd.DataFrame,
-    stock_info: pd.DataFrame,
-    engine: sqlalchemy.Engine,
-    hp: Type[mytypes.HistoricalPrices],
-    interval_str: str,
-) -> None:
-    """
-    Save historical stock price data to a database.
-
-    :param stock_info:
-    :param stock_data: The downloaded stock price data.
-    :param bench_data: The benchmark data.
-    :param engine: A `ConnectionSettings` object containing the database connection settings.
-    :param hp: A `HistoricalPrices` class object containing the name of the table to save the data to.
-    :param interval_str: interval code of the data bars.
-    """
-    # tables = _download_data(**download_params.dict())
-    historical_data, timestamp_data = _build_tables(
-        stock_data, bench_data, interval_str=interval_str
-    )
-    historical_data.to_sql(hp.stock_data, engine, index=False, if_exists="replace")
-    timestamp_data.to_sql(hp.timestamp_data, engine, index=False, if_exists="replace")
-    stock_info.to_sql(hp.stock_info, engine, index=False, if_exists="replace")
+    return absolute_data, relative_data
 
 
 def task_save_historical_data_to_database(
-    download_args: mytypes.DownloadParams, connection_engine: sqlalchemy.Engine
+    watchlist, connection_engine: sqlalchemy.Engine
 ) -> None:
     """
     Schedule the script to save historical data to a database.
     """
-    stock_data, bench_data, stock_info = _download_data(**download_args.dict())
-    save_historical_data_to_database(
-        stock_data,
-        bench_data,
-        stock_info,
-        connection_engine,
-        mytypes.HistoricalPrices,
-        interval_str=download_args.interval_str,
-    )
-
-
-def re_download_stock_data() -> None:
-    """
-    Download and cache stock data locally for testing.
-    """
-    stock_data, bench_data = _download_data(**mytypes.DownloadParams().dict())
-    stock_data.to_pickle(pathlib.Path("../..") / "data" / "stock_data_raw_push_test.pkl")
-    bench_data.to_pickle(pathlib.Path("../..") / "data" / "bench_data_raw_push_test.pkl")
-
-
-def load_pickle_stock_data() -> tuple:
-    """
-    Load price data from pickle for testing.
-
-    :return: A tuple containing the stock data and benchmark data.
-    """
-    stock_data = pd.read_pickle(
-        pathlib.Path("../..") / "data" / "stock_data_raw_push_test.pkl"
-    )
-    bench_data = pd.read_pickle(
-        pathlib.Path("../..") / "data" / "bench_data_raw_push_test.pkl"
-    )
-    return stock_data, bench_data
-
-
-def initiate_data_updater_schedule(
-    download_args: mytypes.DownloadParams,
-    connection_engine: sqlalchemy.Engine,
-    host: str,
-    port: int,
-) -> None:
-    """
-    Schedule the script to run once a day at a specific time.
-
-    :param host:
-    :param port:
-    :param connection_engine:
-    :param download_args:
-    :param trigger_time: The time to run the script.
-    """
-    # Create a socket object
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        # Bind the socket to a specific address and port
-        s.bind((host, port))
-
-        # Listen for incoming connections
-        s.listen()
-
-        task_save_historical_data_to_database(
-            download_args=download_args, connection_engine=connection_engine
+    yahoo_source_stocks = watchlist.loc[watchlist["data_source"] == "yahoo"].copy()
+    interval_data_map = dict()
+    timestamp_data_list = []
+    interval_data_list = []
+    for interval in yahoo_source_stocks["interval"].unique():
+        data = utils.yf_download_data(
+            yahoo_source_stocks.symbol.loc[yahoo_source_stocks.interval == interval].to_list(),
+            int(env.DOWNLOAD_DAYS_BACK),
+            interval
         )
+        # drop open high low from the first level
+        data = data.drop(columns=['open', 'high', 'low'], level=0)
+        data = data.reset_index()
+        data_timestamp = data.columns.to_list()[0]
+        data_date_time = data[data_timestamp]
+        # remove timestamp column
+        data = data.iloc[:, 1:]
 
+        absolute_data, relative_data = build_relative_data_against_interval_markets(
+            yahoo_source_stocks, data, interval)
 
-if __name__ == '__main__':
-    initiate_data_updater_schedule(
-        download_args=mytypes.DownloadParams(
-            stock_table_url=env.DOWNLOAD_STOCK_TABLE_URL,
-            bench=env.DOWNLOAD_BENCHMARK_SYMBOL,
-            days=env.DOWNLOAD_DAYS_BACK,
-            interval_str=env.DOWNLOAD_DATA_INTERVAL,
-        ),
-        connection_engine=env.ConnectionEngines.HistoricalPrices.NEON,
-        host=env.HOST,
-        port=env.PORT
-    )
+        timestamp_data = absolute_data[["bar_number"]].copy()
+        timestamp_data["interval"] = interval
+        timestamp_data["timestamp"] = data_date_time
+        timestamp_data_list.append(timestamp_data)
+
+        absolute_data = absolute_data.melt(
+            id_vars="bar_number", var_name=["symbol"], value_name="close"
+        )
+        absolute_data["is_relative"] = False
+        relative_data = relative_data.melt(
+            id_vars="bar_number", var_name=["symbol"], value_name="close"
+        )
+        relative_data["is_relative"] = True
+        interval_data = pd.concat([absolute_data, relative_data], axis=0)
+        interval_data["interval"] = interval
+        interval_data_list.append(interval_data)
+
+    # create timestamp table
+    timestamp_data = pd.concat(timestamp_data_list, axis=0)
+    historical_data = pd.concat(interval_data_list, axis=0)
+
+    historical_data.to_sql(mytypes.HistoricalPrices.stock_data, connection_engine, index=False, if_exists="replace")
+    timestamp_data.to_sql(mytypes.HistoricalPrices.timestamp_data, connection_engine, index=False, if_exists="replace")

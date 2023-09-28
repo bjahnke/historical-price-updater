@@ -1,9 +1,82 @@
+import typing
+import pandas as pd
 import price_updater as hpu
-import mytypes as mytypes
 import env as env
 from flask import Flask
+import certifi
+from pymongo import MongoClient
+from src.historical_price_updater import utils
 
 app = Flask(__name__)
+ca = certifi.where()
+
+
+class MongoWatchlistClient:
+    def __init__(
+            self,
+            username,
+            password,
+            db_deployment,
+            db_name: str,
+            collection_name: str
+    ):
+        url = f'mongodb+srv://{username}:{password}@{db_deployment}.mongodb.net/?retryWrites=true&w=majority'
+        self.mongo_client = MongoClient(url, tlsCAFile=ca)
+        self.db = self.mongo_client[db_name]
+        self.collection = self.db[collection_name]
+        self.username = username
+        self._latest_watchlist = None
+
+    @property
+    def watchlist(self):
+        if self._latest_watchlist is None:
+            self._latest_watchlist = self.get_latest()
+        return self._latest_watchlist
+
+    def get_latest(self):
+        latest_entry = self.collection.find_one({"username": self.username}, sort=[("_id", -1)])
+        return latest_entry['watchlist']
+
+    def get_latest_as_csv(self, address: str):
+        """
+        Get the latest watchlist as a csv file.
+        :param address:
+        :return:
+        """
+        return pd.DataFrame(self.get_latest()).to_csv(address)
+
+    def update(self, watchlist: typing.List):
+        return self.collection.insert_one({
+            'username': self.username,
+            'watchlist': watchlist
+        })
+
+    def update_with_csv(self, address: str):
+        """
+        Update the watchlist with a csv file.
+        :param address:
+        :return:
+        """
+        df = pd.read_csv(address)
+        return self.update(df.to_dict(orient='records'))
+
+    def yf_download_data(self):
+        """
+        Download price data of watchlist from yahoo finance with the watchlist.
+        :return:
+        """
+        yahoo_source_stocks = self.watchlist.loc[self.watchlist["data_source"] == "yahoo"]
+        downloaded_data = pd.concat([
+            utils.yf_download_data(
+                yahoo_source_stocks.symbol.loc[yahoo_source_stocks.interval == interval].to_list(),
+                int(env.DOWNLOAD_DAYS_BACK),
+                interval
+            )
+            for interval in yahoo_source_stocks["interval"].unique()
+        ])
+        return downloaded_data
+
+
 
 
 @app.route('/', methods=['POST'])
@@ -12,14 +85,36 @@ def handle_request():
     This is the main function that will be called by the cloud function.
     :return:
     """
+    # todo setup mongo connection, get watchlist
+    watchlist_client = MongoWatchlistClient(
+        username=env.MONGO_USERNAME,
+        password=env.MONGO_PASSWORD,
+        db_deployment=env.MONGO_DB_DEPLOYMENT,
+        db_name='asset-tracking',
+        collection_name='watchlist',
+    )
+    engine = env.ConnectionEngines.HistoricalPrices.NEON
+    _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
+
+    latest_sp500.to_sql('stock_info', engine, if_exists='replace')
+
+    new_watchlist_records_from_sp500 = latest_sp500[['symbol']].copy()
+    new_watchlist_records_from_sp500['data_source'] = 'yahoo'
+    new_watchlist_records_from_sp500['interval'] = '1d'
+    new_watchlist_records_from_sp500['auto_synced'] = True
+    new_watchlist_records_from_sp500['market_index'] = 'SPY'
+
+    watchlist = pd.DataFrame.from_records(watchlist_client.get_latest())
+    synced_watchlist = watchlist.loc[watchlist['auto_synced'] == False].copy()
+    synced_watchlist = pd.concat([synced_watchlist, new_watchlist_records_from_sp500]).reset_index(drop=True)
+    # update watchlist if synced_watchlist not equal to watchlist
+    if not synced_watchlist.equals(watchlist):
+        watchlist_client.update(synced_watchlist.to_dict(orient='records'))
+
     hpu.task_save_historical_data_to_database(
-        download_args=mytypes.DownloadParams(
-            stock_table_url=env.DOWNLOAD_STOCK_TABLE_URL,
-            bench=env.DOWNLOAD_BENCHMARK_SYMBOL,
-            days=env.DOWNLOAD_DAYS_BACK,
-            interval_str=env.DOWNLOAD_DATA_INTERVAL,
-        ),
-        connection_engine=env.ConnectionEngines.HistoricalPrices.NEON,
+        watchlist,
+        connection_engine=engine,
     )
     return 'Service executed with no errors'
 

@@ -14,7 +14,7 @@ def get_wikipedia_stocks(url) -> t.Tuple[t.List[str], pd.DataFrame]:
     return tickers_list[:], wiki_df
 
 
-def simple_relative(df, bm_close, rebase=True) -> pd.DataFrame:
+def simple_relative(df: pd.DataFrame, bm_close: pd.Series, rebase=True) -> pd.DataFrame:
     """simplified version of relative calculation"""
     bm = bm_close.ffill()
     if rebase is True:
