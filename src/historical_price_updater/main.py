@@ -1,11 +1,12 @@
 import typing
 import pandas as pd
-import price_updater as hpu
+from src.historical_price_updater import price_updater
 import env as env
 from flask import Flask
 import certifi
 from pymongo import MongoClient
 from src.historical_price_updater import utils
+import src.watchlist
 
 app = Flask(__name__)
 ca = certifi.where()
@@ -77,22 +78,14 @@ class MongoWatchlistClient:
         return downloaded_data
 
 
-
-
 @app.route('/', methods=['POST'])
 def handle_request():
     """
     This is the main function that will be called by the cloud function.
     :return:
     """
-    # todo setup mongo connection, get watchlist
-    watchlist_client = MongoWatchlistClient(
-        username=env.MONGO_USERNAME,
-        password=env.MONGO_PASSWORD,
-        db_deployment=env.MONGO_DB_DEPLOYMENT,
-        db_name='asset-tracking',
-        collection_name='watchlist',
-    )
+    watchlist_client = src.watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
+    watchlist = watchlist_client.get_latest('asset-tracking')['watchlist']
     engine = env.ConnectionEngines.HistoricalPrices.NEON
     _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
@@ -105,14 +98,14 @@ def handle_request():
     new_watchlist_records_from_sp500['auto_synced'] = True
     new_watchlist_records_from_sp500['market_index'] = 'SPY'
 
-    watchlist = pd.DataFrame.from_records(watchlist_client.get_latest())
+    watchlist = pd.DataFrame.from_records(watchlist)
     synced_watchlist = watchlist.loc[watchlist['auto_synced'] == False].copy()
     synced_watchlist = pd.concat([synced_watchlist, new_watchlist_records_from_sp500]).reset_index(drop=True)
     # update watchlist if synced_watchlist not equal to watchlist
     if not synced_watchlist.equals(watchlist):
-        watchlist_client.update(synced_watchlist.to_dict(orient='records'))
+        watchlist_client.update_watchlist(synced_watchlist.to_dict(orient='records'), 'asset-tracking')
 
-    hpu.task_save_historical_data_to_database(
+    price_updater.task_save_historical_data_to_database(
         watchlist,
         connection_engine=engine,
     )

@@ -54,7 +54,6 @@ def task_save_historical_data_to_database(
     Schedule the script to save historical data to a database.
     """
     yahoo_source_stocks = watchlist.loc[watchlist["data_source"] == "yahoo"].copy()
-    interval_data_map = dict()
     timestamp_data_list = []
     interval_data_list = []
     for interval in yahoo_source_stocks["interval"].unique():

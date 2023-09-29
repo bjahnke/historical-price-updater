@@ -5,7 +5,8 @@ pydantic
 pandas
 schedule
 psycopg2-binary
-yfinance
+yfinance==0.2.28
 flask
 pymongo
 certifi
+git+https://github.com/bjahnke/pymongo-watchlist-client.git
