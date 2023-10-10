@@ -78,15 +78,7 @@ class MongoWatchlistClient:
         return downloaded_data
 
 
-@app.route('/', methods=['POST'])
-def handle_request():
-    """
-    This is the main function that will be called by the cloud function.
-    :return:
-    """
-    watchlist_client = src.watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
-    watchlist = watchlist_client.get_latest('asset-tracking')['watchlist']
-    engine = env.ConnectionEngines.HistoricalPrices.NEON
+def sync_watchlist(watchlist, engine):
     _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
 
@@ -98,10 +90,25 @@ def handle_request():
     new_watchlist_records_from_sp500['auto_synced'] = True
     new_watchlist_records_from_sp500['market_index'] = 'SPY'
 
-    watchlist = pd.DataFrame.from_records(watchlist)
     synced_watchlist = watchlist.loc[watchlist['auto_synced'] == False].copy()
     synced_watchlist = pd.concat([synced_watchlist, new_watchlist_records_from_sp500]).reset_index(drop=True)
-    # update watchlist if synced_watchlist not equal to watchlist
+
+    return synced_watchlist
+
+
+@app.route('/', methods=['POST'])
+def handle_request():
+    """
+    This is the main function that will be called by the cloud function.
+    :return:
+    """
+    watchlist_client = src.watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
+    watchlist = watchlist_client.get_latest('asset-tracking')['watchlist']
+    engine = env.ConnectionEngines.HistoricalPrices.NEON
+
+    watchlist = pd.DataFrame.from_records(watchlist)
+    synced_watchlist = sync_watchlist(watchlist, engine)
+
     if not synced_watchlist.equals(watchlist):
         watchlist_client.update_watchlist(synced_watchlist.to_dict(orient='records'), 'asset-tracking')
 

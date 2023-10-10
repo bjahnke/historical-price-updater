@@ -22,12 +22,37 @@ def simple_relative(df: pd.DataFrame, bm_close: pd.Series, rebase=True) -> pd.Da
     return df.div(bm, axis=0)
 
 
-def yf_download_data(tickers, days, interval) -> pd.DataFrame:
-    """batch download of stock history download, normalize columns"""
+def yf_download_data(tickers, bars, interval) -> pd.DataFrame:
+    """
+    batch download of stock history download, normalize columns
+    :param tickers: list of tickers to download data
+    :param bars: number of bars to download
+    :param interval: interval of bars
+    """
+    # calculate start date by multiplying bars by interval 1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk
+    interval_to_timedelta = {
+        '1m': timedelta(minutes=1),
+        '2m': timedelta(minutes=2),
+        '5m': timedelta(minutes=5),
+        '15m': timedelta(minutes=15),
+        '30m': timedelta(minutes=30),
+        '60m': timedelta(hours=1),
+        '1h': timedelta(hours=1),
+        '1d': timedelta(days=1),
+        '5d': timedelta(days=5)
+    }
+    if interval in interval_to_timedelta:
+        interval_timedelta = interval_to_timedelta[interval]
+    else:
+        raise ValueError("Invalid interval")
+
+    end = datetime.now()
+    start = end - (bars * interval_timedelta)
+
     data = yf.download(
         tickers,
-        start=(datetime.now() - timedelta(days=days)),
-        end=datetime.now(),
+        start=start,
+        end=end,
         interval=interval,
     )
     return _normalize_yfinance_dataframe(data)

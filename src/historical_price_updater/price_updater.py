@@ -43,9 +43,7 @@ def build_relative_data_against_interval_markets(
     return absolute_data, relative_data
 
 
-def task_save_historical_data_to_database(
-    watchlist, connection_engine: sqlalchemy.Engine
-) -> None:
+def transform_data_for_db(watchlist):
     """
     Schedule the script to save historical data to a database.
     """
@@ -55,7 +53,7 @@ def task_save_historical_data_to_database(
     for interval in yahoo_source_stocks["interval"].unique():
         data = utils.yf_download_data(
             yahoo_source_stocks.symbol.loc[yahoo_source_stocks.interval == interval].to_list(),
-            int(env.DOWNLOAD_DAYS_BACK),
+            1000,
             interval
         )
         # drop open high low from the first level
@@ -89,6 +87,16 @@ def task_save_historical_data_to_database(
     # create timestamp table
     timestamp_data = pd.concat(timestamp_data_list, axis=0)
     historical_data = pd.concat(interval_data_list, axis=0)
+    return historical_data, timestamp_data
+
+
+def task_save_historical_data_to_database(
+    watchlist, connection_engine: sqlalchemy.Engine
+) -> None:
+    """
+    Schedule the script to save historical data to a database.
+    """
+    historical_data, timestamp_data = transform_data_for_db(watchlist)
 
     historical_data.to_sql(mytypes.HistoricalPrices.stock_data, connection_engine, index=False, if_exists="replace")
     timestamp_data.to_sql(mytypes.HistoricalPrices.timestamp_data, connection_engine, index=False, if_exists="replace")
