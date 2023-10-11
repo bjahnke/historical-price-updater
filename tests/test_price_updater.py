@@ -21,7 +21,7 @@ def test_transform_data_for_db():
         'data_source': ['yahoo', 'yahoo'],
         'market_index': ['ONEQ', 'SPY']
     })
-    historical_data1, timestamp_data1 = hpu.transform_data_for_db(watchlist)
+    historical_data1, timestamp_data1, stock1 = hpu.transform_data_for_db(watchlist)
 
     watchlist = pd.DataFrame({
         'symbol': ['SPY', 'ONEQ'],
@@ -29,7 +29,7 @@ def test_transform_data_for_db():
         'data_source': ['yahoo', 'yahoo'],
         'market_index': ['ONEQ', 'SPY']
     })
-    historical_data2, timestamp_data2 = hpu.transform_data_for_db(watchlist)
+    historical_data2, timestamp_data2, stock2 = hpu.transform_data_for_db(watchlist)
     print('done')
 
 

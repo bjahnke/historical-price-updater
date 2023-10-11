@@ -1,5 +1,9 @@
+from typing import Tuple, Any
+
 import pandas as pd
 import sqlalchemy
+from pandas import DataFrame
+
 import src.historical_price_updater.utils as utils
 import src.historical_price_updater.mytypes as mytypes
 import typing as t
@@ -43,11 +47,12 @@ def build_relative_data_against_interval_markets(
     return absolute_data, relative_data
 
 
-def transform_data_for_db(watchlist):
+def transform_data_for_db(watchlist) -> t.Tuple[DataFrame, DataFrame, DataFrame]:
     """
     Schedule the script to save historical data to a database.
     """
-    yahoo_source_stocks = watchlist.loc[watchlist["data_source"] == "yahoo"].copy()
+    data_source = 'yahoo'
+    yahoo_source_stocks = watchlist.loc[watchlist["data_source"] == data_source].copy()
     timestamp_data_list = []
     interval_data_list = []
     for interval in yahoo_source_stocks["interval"].unique():
@@ -86,8 +91,22 @@ def transform_data_for_db(watchlist):
 
     # create timestamp table
     timestamp_data = pd.concat(timestamp_data_list, axis=0)
+    timestamp_data['data_source'] = data_source
     historical_data = pd.concat(interval_data_list, axis=0)
-    return historical_data, timestamp_data
+    historical_data['data_source'] = data_source
+
+    historical_candidate_key = ["symbol", 'is_relative', 'interval', 'data_source']
+
+    stock = historical_data[historical_candidate_key].drop_duplicates().copy()
+
+    stock = stock.reset_index(drop=True).reset_index().rename(columns={"index": "id"})
+    # set stock_id as column in historical data where symbol, is_relative, interval match,
+    # then drop those columns from historical data
+    historical_data = historical_data.merge(stock, on=historical_candidate_key)
+    historical_data = historical_data.drop(columns=historical_candidate_key)
+    historical_data = historical_data.rename(columns={"id": "stock_id"})
+
+    return historical_data, timestamp_data, stock
 
 
 def task_save_historical_data_to_database(
@@ -96,7 +115,8 @@ def task_save_historical_data_to_database(
     """
     Schedule the script to save historical data to a database.
     """
-    historical_data, timestamp_data = transform_data_for_db(watchlist)
+    historical_data, timestamp_data, stock = transform_data_for_db(watchlist)
 
+    stock.to_sql('stock', connection_engine, index=False, if_exists="replace")
     historical_data.to_sql(mytypes.HistoricalPrices.stock_data, connection_engine, index=False, if_exists="replace")
     timestamp_data.to_sql(mytypes.HistoricalPrices.timestamp_data, connection_engine, index=False, if_exists="replace")
