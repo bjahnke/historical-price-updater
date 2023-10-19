@@ -108,8 +108,8 @@ def handle_request():
     engine = env.ConnectionEngines.HistoricalPrices.NEON
 
     watchlist = pd.DataFrame.from_records(watchlist)
-    # if SP500 is in watchlist, sync
-    if 'SP500' in watchlist['market_index'].unique():
+    # if SP500 is in watchlist, track all current SP500 stocks
+    if 'SP500' in watchlist['symbol'].unique():
         synced_watchlist = sync_watchlist(watchlist, engine)
         if not synced_watchlist.equals(watchlist):
             watchlist_client.update_watchlist(synced_watchlist.to_dict(orient='records'), 'asset-tracking')
