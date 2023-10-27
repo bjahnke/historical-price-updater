@@ -78,7 +78,7 @@ ca = certifi.where()
 #         return downloaded_data
 
 
-def sync_watchlist(watchlist: pd.DataFrame, engine):
+def get_sp500_watchlist(engine):
 
     _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
@@ -91,10 +91,7 @@ def sync_watchlist(watchlist: pd.DataFrame, engine):
     new_watchlist_records_from_sp500['auto_synced'] = True
     new_watchlist_records_from_sp500['market_index'] = 'SPY'
 
-    synced_watchlist = watchlist.loc[watchlist['auto_synced'] == False].copy()
-    synced_watchlist = pd.concat([synced_watchlist, new_watchlist_records_from_sp500]).reset_index(drop=True)
-
-    return synced_watchlist
+    return new_watchlist_records_from_sp500
 
 
 @app.route('/', methods=['POST'])
@@ -110,10 +107,11 @@ def handle_request():
     watchlist = pd.DataFrame.from_records(watchlist)
     # if SP500 is in watchlist, track all current SP500 stocks
     if 'SP500' in watchlist['symbol'].unique():
-        synced_watchlist = sync_watchlist(watchlist, engine)
-        if not synced_watchlist.equals(watchlist):
-            watchlist_client.update_watchlist(synced_watchlist.to_dict(orient='records'), 'asset-tracking')
-            watchlist = synced_watchlist
+        sp500_watchlist = get_sp500_watchlist(engine)
+        # remove the SP500 from the watchlist
+        watchlist = watchlist.loc[watchlist['symbol'] != 'SP500'].copy()
+        # add the SP500 watchlist to the watchlist
+        watchlist = pd.concat([watchlist, sp500_watchlist]).reset_index(drop=True).drop_duplicates()
 
     price_updater.task_save_historical_data_to_database(
         watchlist,
