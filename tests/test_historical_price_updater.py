@@ -24,7 +24,7 @@ def test_build_tables():
     assert historical_data.is_relative.isnull().sum() == 0
     # historical_data.symbol should be a string and never null
     assert historical_data.symbol.dtype == 'O'
-assert historical_data.symbol.isnull().sum() == 0
+    assert historical_data.symbol.isnull().sum() == 0
 
 
 def test_connection():

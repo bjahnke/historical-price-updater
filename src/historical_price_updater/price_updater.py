@@ -105,6 +105,7 @@ def transform_data_for_db(watchlist) -> t.Tuple[DataFrame, DataFrame, DataFrame]
     historical_data = historical_data.merge(stock, on=historical_candidate_key)
     historical_data = historical_data.drop(columns=historical_candidate_key)
     historical_data = historical_data.rename(columns={"id": "stock_id"})
+    historical_data = historical_data.dropna()
 
     return historical_data, timestamp_data, stock
 
