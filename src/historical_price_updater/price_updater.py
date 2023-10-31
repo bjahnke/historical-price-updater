@@ -35,7 +35,7 @@ def build_relative_data_against_interval_markets(
                 (source_watchlist["interval"] == interval)
                 ].symbol.to_list()
         ].copy()
-        relative_data_list.append(utils.simple_relative(base_data, bench_data[market_index]))
+        relative_data_list.append(utils.simple_relative(base_data, bench_data[market_index], rebase=False))
         base_data_list.append(base_data)
 
     absolute_data = pd.concat(base_data_list, axis=1)
