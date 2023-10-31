@@ -19,7 +19,10 @@ def simple_relative(df: pd.DataFrame, bm_close: pd.Series, rebase=True) -> pd.Da
     bm = bm_close.ffill()
     if rebase is True:
         bm = bm.div(bm[0])
-    return df.div(bm, axis=0)
+        multiple = 1
+    else:
+        multiple = 1000
+    return df.div(bm, axis=0) * multiple
 
 
 def yf_download_data(tickers, bars, interval) -> pd.DataFrame:
