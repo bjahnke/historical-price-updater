@@ -47,7 +47,7 @@ def build_relative_data_against_interval_markets(
     return absolute_data, relative_data
 
 
-def transform_data_for_db(watchlist) -> t.Tuple[DataFrame, DataFrame, DataFrame]:
+def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFrame, DataFrame]:
     """
     Schedule the script to save historical data to a database.
     """
@@ -98,6 +98,11 @@ def transform_data_for_db(watchlist) -> t.Tuple[DataFrame, DataFrame, DataFrame]
     historical_candidate_key = ["symbol", 'is_relative', 'interval', 'data_source']
 
     stock = historical_data[historical_candidate_key].drop_duplicates().copy()
+    stock = stock.merge(
+        watchlist,
+        on=["symbol", "interval", "data_source"],
+        how="left",
+    )
 
     stock = stock.reset_index(drop=True).reset_index().rename(columns={"index": "id"})
     # set stock_id as column in historical data where symbol, is_relative, interval match,

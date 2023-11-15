@@ -7,6 +7,7 @@ docs/
 test/
 .git/
 docker/
+tests/
 *.rst
 *.pyc
 *.pyo
