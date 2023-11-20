@@ -8,6 +8,7 @@ import src.historical_price_updater.utils as utils
 import src.historical_price_updater.mytypes as mytypes
 import typing as t
 import env
+import src.historical_price_updater.extract as extract
 
 
 def build_relative_data_against_interval_markets(
@@ -19,8 +20,9 @@ def build_relative_data_against_interval_markets(
     :param interval:
     :return:
     """
-    base_data_list = []
-    relative_data_list = []
+    # init with empty df to cover data for only one symbol
+    base_data_list = [pd.DataFrame()]
+    relative_data_list = [pd.DataFrame()]
 
     market_index_at_interval = source_watchlist.loc[
         source_watchlist["interval"] == interval, "market_index"].unique()
@@ -47,22 +49,69 @@ def build_relative_data_against_interval_markets(
     return absolute_data, relative_data
 
 
-def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFrame, DataFrame]:
+_EXTRACTORS_MAP = {
+    'ibkr': extract.IbkrPriceExtractor(),
+    'yahoo': extract.YahooPriceExtractor(),
+}
+
+
+def transform_data_for_db_multi_data_source(watchlist: pd.DataFrame):
+    """
+    call transform_data_for_db for each unique data source in watchlist,
+    concat results and return
+    """
+    data_source_list = watchlist.data_source.unique()
+    historical_data_list = []
+    timestamp_data_list = []
+    for data_source in data_source_list:
+        watchlist_by_source = watchlist.loc[watchlist["data_source"] == data_source].copy()
+        historical_data, timestamp_data = transform_data_for_db(watchlist_by_source)
+        historical_data_list.append(historical_data)
+        timestamp_data_list.append(timestamp_data)
+
+    historical_data = pd.concat(historical_data_list, axis=0).reset_index(drop=True)
+    timestamp_data = pd.concat(timestamp_data_list, axis=0).reset_index(drop=True)
+
+    historical_candidate_key = ["symbol", 'is_relative', 'interval', 'data_source']
+
+    stock = historical_data[historical_candidate_key].drop_duplicates().copy()
+
+    stock = stock.merge(
+        watchlist,
+        on=["symbol", "interval", "data_source"],
+        how="left",
+    )
+
+    stock = stock.reset_index(drop=True).reset_index().rename(columns={"index": "id"})
+
+    # set stock_id as column in historical data where symbol, is_relative, interval match,
+    # then drop those columns from historical data
+    historical_data = historical_data.merge(stock[historical_candidate_key + ['id']], on=historical_candidate_key)
+    historical_data = historical_data.drop(columns=historical_candidate_key)
+    historical_data = historical_data.rename(columns={"id": "stock_id"})
+    historical_data = historical_data.dropna()
+
+    return historical_data, timestamp_data, stock
+
+
+def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFrame]:
     """
     Schedule the script to save historical data to a database.
     """
-    data_source = 'yahoo'
-    yahoo_source_stocks = watchlist.loc[watchlist["data_source"] == data_source].copy()
     timestamp_data_list = []
     interval_data_list = []
-    for interval in yahoo_source_stocks["interval"].unique():
-        data = utils.yf_download_data(
-            yahoo_source_stocks.symbol.loc[yahoo_source_stocks.interval == interval].to_list(),
-            1000,
-            interval
+    data_source = watchlist.data_source.iloc[0]
+    extractor = _EXTRACTORS_MAP[data_source]
+    for interval in watchlist["interval"].unique():
+        watchlist_by_interval = watchlist.loc[watchlist["interval"] == interval].copy()
+        data = extractor.download(
+            watchlist_by_interval.symbol.to_list(),
+            interval, 
+            1000, 
+            watchlist_by_interval.sec_type.to_list()
         )
-        # drop open high low from the first level
-        data = data.drop(columns=['open', 'high', 'low'], level=0)
+        # keep only close column
+        data = data.drop(columns=data.columns.levels[0].difference(['close']), level=0)
         data = data.reset_index()
         data_timestamp = data.columns.to_list()[0]
         data_date_time = data[data_timestamp]
@@ -70,7 +119,7 @@ def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFra
         data = data.iloc[:, 1:]
 
         absolute_data, relative_data = build_relative_data_against_interval_markets(
-            yahoo_source_stocks, data, interval)
+            watchlist, data, interval)
 
         timestamp_data = absolute_data[["bar_number"]].copy()
         timestamp_data["interval"] = interval
@@ -89,30 +138,14 @@ def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFra
         interval_data["interval"] = interval
         interval_data_list.append(interval_data)
 
-    # create timestamp table
+
+        # create timestamp table
     timestamp_data = pd.concat(timestamp_data_list, axis=0)
     timestamp_data['data_source'] = data_source
     historical_data = pd.concat(interval_data_list, axis=0)
     historical_data['data_source'] = data_source
 
-    historical_candidate_key = ["symbol", 'is_relative', 'interval', 'data_source']
-
-    stock = historical_data[historical_candidate_key].drop_duplicates().copy()
-    stock = stock.merge(
-        watchlist,
-        on=["symbol", "interval", "data_source"],
-        how="left",
-    )
-
-    stock = stock.reset_index(drop=True).reset_index().rename(columns={"index": "id"})
-    # set stock_id as column in historical data where symbol, is_relative, interval match,
-    # then drop those columns from historical data
-    historical_data = historical_data.merge(stock, on=historical_candidate_key)
-    historical_data = historical_data.drop(columns=historical_candidate_key)
-    historical_data = historical_data.rename(columns={"id": "stock_id"})
-    historical_data = historical_data.dropna()
-
-    return historical_data, timestamp_data, stock
+    return historical_data, timestamp_data
 
 
 def task_save_historical_data_to_database(
@@ -121,7 +154,7 @@ def task_save_historical_data_to_database(
     """
     Schedule the script to save historical data to a database.
     """
-    historical_data, timestamp_data, stock = transform_data_for_db(watchlist)
+    historical_data, timestamp_data, stock = transform_data_for_db_multi_data_source(watchlist)
 
     stock.to_sql('stock', connection_engine, index=False, if_exists="replace")
     historical_data.to_sql(mytypes.HistoricalPrices.stock_data, connection_engine, index=False, if_exists="replace")
