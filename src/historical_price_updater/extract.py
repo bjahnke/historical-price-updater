@@ -56,26 +56,43 @@ class IbkrPriceExtractor(HistoricalPriceExtractor):
         '1d': '1 day',
         '1h': '1 hour',
         '1m': '1 min',
+        '5m': '5 mins',
     }
     def __init__(self):
         # TODO this class can only be initialized once.
         self.ib = IB()
+        self.contracts_table = pd.DataFrame()
 
     @staticmethod
     def contracts_generator(ib, symbol: str, sec_type: str) -> List[Contract]:
-        contracts = ib.reqContractDetails(Contract(symbol=symbol, secType=sec_type))
+        contracts = ib.reqContractDetails(Contract(symbol=symbol, secType=sec_type, includeExpired=False))
         if len(contracts) == 0:
             raise ValueError(f'No contract found for symbol={symbol}, sec_type={sec_type}')
         for contract in contracts:
-            yield contract
+            if sec_type == 'FUT':
+                if (
+                    int(contract.contract.lastTradeDateOrContractMonth) >= int(pd.Timestamp.today().strftime('%Y%m%d'))
+                ):
+                    yield contract
+            else:
+                yield contract
         
     def _get_data(self, ib, symbol: str, interval: str, num_bars: int, sec_type, *_, **__) -> pd.DataFrame:
         interval = self.__class__.interval_map[interval]
+        use_rth = False
         # assume bars are days for now
         if num_bars > 365:
             duration = '2 Y'
         else:
             duration = f'{num_bars} D'
+
+        if interval == '5 mins':
+            duration = '1 W'
+            use_rth = False
+        elif interval == '1 min':
+            duration = '2 D'
+            use_rth = False
+
         found = []
         for contract in self.__class__.contracts_generator(ib, symbol, sec_type):
             contract = contract.contract
@@ -85,13 +102,16 @@ class IbkrPriceExtractor(HistoricalPriceExtractor):
                 durationStr=duration,
                 barSizeSetting=interval,
                 whatToShow='TRADES',
-                useRTH=True,
-                formatDate=1
+                useRTH=use_rth,
+                formatDate=1,
             )
             if len(bars) > 0:
                 found.append((contract.exchange, contract.primaryExchange))
                 break
-        df = util.df(bars).rename(columns={'date': 'Date'})
+        try:
+            df = util.df(bars).rename(columns={'date': 'Date'})
+        except UnboundLocalError:
+            pass
         df = df.set_index('Date')
         return df
     
@@ -116,7 +136,9 @@ class IbkrPriceExtractor(HistoricalPriceExtractor):
 
         # Concatenate horizontally with multi-level column index
         price_data_table = pd.concat(price_datas, axis=1)
-        return price_data_table
+        # sort by index
+        price_data_table = price_data_table.sort_index()
+        return price_data_table.ffill()
     
     def transform(self, *args, **kwargs):
         pass

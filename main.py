@@ -78,20 +78,7 @@ ca = certifi.where()
 #         return downloaded_data
 
 
-def get_sp500_watchlist(engine):
 
-    _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
-    latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
-
-    latest_sp500.to_sql('stock_info', engine, if_exists='replace')
-
-    new_watchlist_records_from_sp500 = latest_sp500[['symbol']].copy()
-    new_watchlist_records_from_sp500['data_source'] = 'yahoo'
-    new_watchlist_records_from_sp500['interval'] = '1d'
-    new_watchlist_records_from_sp500['auto_synced'] = True
-    new_watchlist_records_from_sp500['market_index'] = 'SPY'
-
-    return new_watchlist_records_from_sp500
 
 
 @app.route('/', methods=['POST'])
@@ -100,27 +87,10 @@ def handle_request():
     This is the main function that will be called by the cloud function.
     :return:
     """
-    watchlist_client = src.watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
-    watchlist = watchlist_client.get_latest('asset-tracking')['watchlist']
-    engine = env.ConnectionEngines.HistoricalPrices.NEON
-
-    watchlist = pd.DataFrame.from_records(watchlist)
-    # if SP500 is in watchlist, track all current SP500 stocks
-    if 'SP500' in watchlist['symbol'].unique():
-        sp500_watchlist = get_sp500_watchlist(engine)
-        # remove the SP500 from the watchlist
-        watchlist = watchlist.loc[watchlist['symbol'] != 'SP500'].copy()
-        # add the SP500 watchlist to the watchlist
-        watchlist = pd.concat([watchlist, sp500_watchlist]).reset_index(drop=True).drop_duplicates()
-
-    price_updater.task_save_historical_data_to_database(
-        watchlist,
-        connection_engine=engine,
-    )
+    price_updater.main()
     return 'Service executed with no errors'
 
 
 if __name__ == '__main__':
-    handle_request()
-    app.run(host='0.0.0.0', port=8080)
+    price_updater.main()
 

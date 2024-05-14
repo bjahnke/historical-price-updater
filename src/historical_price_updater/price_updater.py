@@ -1,3 +1,4 @@
+import math
 from typing import Tuple, Any
 
 import pandas as pd
@@ -9,6 +10,7 @@ import src.historical_price_updater.mytypes as mytypes
 import typing as t
 import env
 import src.historical_price_updater.extract as extract
+import src.watchlist
 
 
 def build_relative_data_against_interval_markets(
@@ -148,6 +150,11 @@ def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFra
     return historical_data, timestamp_data
 
 
+def custom_round(value):
+    decimal_places = max(0, 5 - int(math.floor(math.log10(abs(value)))))
+    return round(value, decimal_places)
+
+
 def task_save_historical_data_to_database(
     watchlist, connection_engine: sqlalchemy.Engine
 ) -> None:
@@ -157,5 +164,46 @@ def task_save_historical_data_to_database(
     historical_data, timestamp_data, stock = transform_data_for_db_multi_data_source(watchlist)
 
     stock.to_sql('stock', connection_engine, index=False, if_exists="replace")
+
     historical_data.to_sql(mytypes.HistoricalPrices.stock_data, connection_engine, index=False, if_exists="replace")
     timestamp_data.to_sql(mytypes.HistoricalPrices.timestamp_data, connection_engine, index=False, if_exists="replace")
+
+
+def get_sp500_watchlist(engine):
+
+    _, latest_sp500 = utils.get_wikipedia_stocks('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    latest_sp500 = latest_sp500.rename(columns={'Symbol': 'symbol'})
+
+    latest_sp500.to_sql('stock_info', engine, if_exists='replace')
+
+    new_watchlist_records_from_sp500 = latest_sp500[['symbol']].copy()
+    new_watchlist_records_from_sp500['data_source'] = 'yahoo'
+    new_watchlist_records_from_sp500['interval'] = '1d'
+    new_watchlist_records_from_sp500['market_index'] = 'SPY'
+    new_watchlist_records_from_sp500['sec_type'] = 'STK'
+
+    return new_watchlist_records_from_sp500
+
+
+def main():
+    """
+    This is the main function that will be called by the cloud function.
+    :return:
+    """
+    watchlist_client = src.watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
+    watchlist = watchlist_client.get_latest('asset-tracking')['watchlist']
+    engine = env.ConnectionEngines.HistoricalPrices.NEON
+
+    watchlist = pd.DataFrame.from_records(watchlist)
+    # if SP500 is in watchlist, track all current SP500 stocks
+    if 'SP500' in watchlist['symbol'].unique():
+        sp500_watchlist = get_sp500_watchlist(engine)
+        # remove the SP500 from the watchlist
+        watchlist = watchlist.loc[watchlist['symbol'] != 'SP500'].copy()
+        # add the SP500 watchlist to the watchlist
+        watchlist = pd.concat([watchlist, sp500_watchlist]).reset_index(drop=True).drop_duplicates()
+
+    task_save_historical_data_to_database(
+        watchlist,
+        connection_engine=engine,
+    )
