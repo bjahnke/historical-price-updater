@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
 import src.historical_price_updater.price_updater as hpu
+from ib_insync import *
+from src.historical_price_updater.extract import *
 
 class TestTransform:
     def test_transform_data_for_db1(self):
@@ -92,52 +94,39 @@ class TestTransform:
         # assert index is unique
         assert historical_data.index.is_unique
 
-    # def test_build_relative_data_against_interval_markets1(self):
-    #     watchlist = pd.DataFrame({
-    #         'symbol': ['SPY', 'ONEQ'],
-    #         'interval': ['1h', '1h'],
-    #         'data_source': ['yahoo', 'yahoo'],
-    #         'market_index': ['ONEQ', 'SPY']
-    #     })
-    #     hpu.build_relative_data_against_interval_markets(watchlist, pd.DataFrame(), '1h')
+    def test_transform_data_for_db_multi_data_source2(self):
+        watchlist = pd.DataFrame({
+            'symbol': ['MES', 'MNQ'],
+            'interval': ['1d', '1d'],
+            'data_source': ['ibkr', 'ibkr'],
+            'market_index': ['ONEQ', 'MES'],
+            'sec_type': ['FUT', 'FUT']
+        })
 
-    # def test_build_relative_data_against_interval_markets2(self):
-    #     source_watchlist = pd.DataFrame({
-    #         'symbol': ['AAPL', 'MSFT', 'TSLA', 'SPY', 'ONEQ'],
-    #         'interval': ['1d', '1d', '1d', '1h', '1h'],
-    #         'days': [365, 365, 365, 365, 365],
-    #         'market_index': ['SPY', 'SPY', 'SPY', 'ONEQ', 'SPY'],
-    #         'data_source': ['yahoo', 'yahoo', 'yahoo', 'yahoo', 'yahoo']
-    #     })
-    #     data = pd.DataFrame({
-    #         'AAPL': [1, 2, 3],
-    #         'MSFT': [4, 5, 6],
-    #         'TSLA': [7, 8, 9],
-    #         'SPY': [10, 11, 12],
-    #         'ONEQ': [13, 14, 15]
-    #     })
-    #     interval = '1d'
+        ibkr = IbkrPriceExtractor()
+        data = ibkr.download(watchlist.symbol.to_list(), '1d', 1000, sec_types=watchlist.sec_type.to_list())
 
-    #     absolute_data, relative_data = hpu.build_relative_data_against_interval_markets(source_watchlist, data, interval)
+        historical_data, timestamp_data, stock = hpu.transform_data_for_db_multi_data_source(watchlist)
+        # assert historical_data has expected columns
+        assert set(historical_data.columns) == {'bar_number', 'close', 'stock_id'}
 
-    #     # assert absolute_data has expected columns
-    #     assert set(absolute_data.columns) == {'bar_number', 'AAPL', 'MSFT', 'TSLA'}
+        # assert timestamp_data has expected columns
+        assert set(timestamp_data.columns) == {'bar_number', 'interval', 'timestamp', 'data_source'}
 
-    #     # assert relative_data has expected columns
-    #     assert set(relative_data.columns) == {'bar_number', 'AAPL', 'MSFT', 'TSLA'}
+        # assert stock has expected columns
+        assert set(stock.columns) == {'id', 'symbol', 'is_relative', 'interval', 'data_source', 'market_index', 'sec_type'}
 
-    #     # assert absolute_data has expected values
-    #     assert absolute_data.to_dict() == {
-    #         'bar_number': {0: 0, 1: 1, 2: 2},
-    #         'AAPL': {0: 1, 1: 2, 2: 3},
-    #         'MSFT': {0: 4, 1: 5, 2: 6},
-    #         'TSLA': {0: 7, 1: 8, 2: 9}
-    #     }
+        # assert stock table has market_index col
+        assert 'market_index' in stock.columns.to_list()
 
-    #     # assert relative_data has expected values
-    #     assert relative_data.to_dict() == {
-    #         'bar_number': {0: 0, 1: 1, 2: 2},
-    #         'AAPL': {0: 1.0, 1: 1.0, 2: 1.0},
-    #         'MSFT': {0: 4.0, 1: 5.0, 2: 6.0},
-    #         'TSLA': {0: 7.0, 1: 8.0, 2: 9.0}
-    #     }
+        # assert historical_data has no NaN values
+        assert not historical_data.isna().any().any()
+
+        # assert timestamp_data has no NaN values
+        assert not timestamp_data.isna().any().any()
+
+        # assert stock has no NaN values
+        assert not stock.isna().any().any()
+
+        # assert index is unique
+        assert historical_data.index.is_unique

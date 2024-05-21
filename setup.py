@@ -14,7 +14,6 @@ requirements = [
     "data_manager @ git+https://github.com/bjahnke/data_manager.git#egg=data_manager",
     "sqlalchemy",
     "pandas",
-    "schedule",
 ]
 
 test_requirements = [
@@ -25,18 +24,7 @@ setup(
     author="Brian Jahnke",
     author_email="bjahnke71@gmail.com",
     python_requires=">=3.6",
-    classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Natural Language :: English",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-    ],
     description="download stock data, reformat, push to database",
-    entry_points={},
     install_requires=requirements,
     license="MIT license",
     long_description=readme + "\n\n" + history,

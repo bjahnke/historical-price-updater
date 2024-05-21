@@ -6,6 +6,7 @@ import env
 import src.watchlist as watchlist
 from ib_insync import *
 
+
 class BaseTestHistoricalPriceExtractor:
     def test_download(self, data_extractor: HistoricalPriceExtractor):
         df = data_extractor.download(['AAPL', 'GOOGL'], '1d', 366, sec_types=['STK', 'STK'])
@@ -24,8 +25,8 @@ class BaseTestHistoricalPriceExtractor:
     def test_get_data(self, data_extractor: HistoricalPriceExtractor):
         symbol = "MES" if data_extractor.__class__.__name__ == 'IbkrPriceExtractor' else "MES=F"
         sec_type = "FUT"
-        interval = '1d'
-        num_bars = 1000
+        interval = '1m'
+        num_bars = 300
         df = data_extractor.get_data(symbol, interval, num_bars, sec_type)
         assert isinstance(df, pd.DataFrame)
         has_columns = ['open', 'high', 'low', 'close']
@@ -41,10 +42,10 @@ class TestIbkrPriceExtractor(BaseTestHistoricalPriceExtractor):
         return IbkrPriceExtractor()
     
     def test__get_data(self, data_extractor):
-        symbol = 'AAPL'
+        symbol = 'SPY'
         interval = '1d'
         sec_type = 'STK'
-        num_bars = 30
+        num_bars = 1000
         with IB() as ib:
             ib.connect(port=7496)
             df = data_extractor._get_data(ib, symbol, interval, num_bars, sec_type)
@@ -106,8 +107,3 @@ def get_watchlist():
     res = w.get_latest('asset-tracking')['watchlist']
     pd.DataFrame.from_records(res).to_excel('watchlist.xlsx')
 
-
-def update_watchlist():
-    df = pd.read_excel('watchlist.xlsx', index_col=0)
-    w = watchlist.MongoWatchlistClient(env.WATCHLIST_API_KEY)
-    w.update_watchlist(df.to_dict(orient='records'), 'asset-tracking')

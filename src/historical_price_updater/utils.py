@@ -37,6 +37,7 @@ def yf_download_data(tickers, bars, interval) -> pd.DataFrame:
         '1m': timedelta(minutes=1),
         '2m': timedelta(minutes=2),
         '5m': timedelta(minutes=5),
+        '10m': timedelta(minutes=10),
         '15m': timedelta(minutes=15),
         '30m': timedelta(minutes=30),
         '60m': timedelta(hours=1),
