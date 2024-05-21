@@ -1,5 +1,15 @@
 from src.util_invoke_tasks import *
 import env
+import subprocess
+
+@task
+def updateKpdb(c):
+    """
+    Sync the local kpdb file with the remote kpdb file.
+    :return:
+    """
+    print("Pulling latest kdbx file...")
+    subprocess.run(['git', 'pull', env.KDBX_REPO], check=True)
 
 
 @task

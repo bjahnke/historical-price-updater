@@ -45,7 +45,7 @@ def ib_connect(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         with _ib as ib:
-            ib.connect('127.0.0.1', 7496, clientId=1)
+            ib.connect('127.0.0.1', 4001, clientId=1)
             result = func(*args, **kwargs)
         return result
     wrapper.ib = _ib

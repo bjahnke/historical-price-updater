@@ -10,3 +10,5 @@ flask
 pymongo
 certifi
 git+https://github.com/bjahnke/pymongo-watchlist-client.git
+pykeepass
+ib_insync

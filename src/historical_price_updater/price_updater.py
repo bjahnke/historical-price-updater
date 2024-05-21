@@ -28,6 +28,7 @@ def build_relative_data_against_interval_markets(
         source_watchlist["interval"] == interval, "market_index"].unique()
     for market_index in market_index_at_interval:
         if pd.isna(market_index) or market_index not in data.close.columns.to_list():
+            print('data not processed for market index:', market_index)
             continue
         bench_data = data.close[[market_index]].copy()
         # exclude bench data from base data
@@ -127,11 +128,11 @@ def transform_data_for_db(watchlist: pd.DataFrame) -> t.Tuple[DataFrame, DataFra
         timestamp_data_list.append(timestamp_data)
 
         absolute_data = absolute_data.melt(
-            id_vars="bar_number", var_name=["symbol"], value_name="close"
+            id_vars=["bar_number"], var_name="symbol", value_name="close"
         )
         absolute_data["is_relative"] = False
         relative_data = relative_data.melt(
-            id_vars="bar_number", var_name=["symbol"], value_name="close"
+            id_vars=["bar_number"], var_name="symbol", value_name="close"
         )
         relative_data["is_relative"] = True
         interval_data = pd.concat([absolute_data, relative_data], axis=0)
