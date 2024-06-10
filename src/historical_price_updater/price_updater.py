@@ -157,12 +157,18 @@ def custom_round(value):
 
 
 def task_save_historical_data_to_database(
-    watchlist, connection_engine: sqlalchemy.Engine
+    watchlist, connection_engine: sqlalchemy.Engine,
+    exclude_current_data: bool = False
 ) -> None:
     """
     Schedule the script to save historical data to a database.
     """
     historical_data, timestamp_data, stock = transform_data_for_db_multi_data_source(watchlist)
+
+    if exclude_current_data:
+        historical_data = historical_data.iloc[:-1]
+        timestamp_data = timestamp_data.iloc[:-1]
+
 
     stock.to_sql('stock', connection_engine, index=False, if_exists="replace")
 
@@ -186,7 +192,7 @@ def get_sp500_watchlist(engine):
     return new_watchlist_records_from_sp500
 
 
-def main():
+def main(exclude_current_data: bool = False):
     """
     This is the main function that will be called by the cloud function.
     :return:
@@ -207,4 +213,5 @@ def main():
     task_save_historical_data_to_database(
         watchlist,
         connection_engine=engine,
+        exclude_current_data=exclude_current_data
     )

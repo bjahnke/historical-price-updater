@@ -16,6 +16,6 @@ DOWNLOAD_DAYS_BACK = os.environ.get("DOWNLOAD_DAYS_BACK", 365)
 DOWNLOAD_DATA_INTERVAL = os.environ.get("DOWNLOAD_DATA_INTERVAL", "1d")
 
 
-# class ConnectionEngines:
-#     class HistoricalPrices:
-#         NEON = create_engine(NEON_DB_CONSTR)
+class ConnectionEngines:
+    class HistoricalPrices:
+        NEON = create_engine(NEON_DB_CONSTR)
